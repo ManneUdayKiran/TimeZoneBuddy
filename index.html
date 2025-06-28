@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TimeZoneBuddy</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f4f4f4;
+      color: #333;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+    }
+    #cityList {
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+    .results {
+      margin-top: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    .add-btn {
+      background-color: #2980b9;
+      color: white;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🕒 TimeZoneBuddy</h1>
+    <p>Enter two or more city names (e.g., New York, London, Tokyo):</p>
+    <input type="text" id="cityInput" placeholder="Enter city name" />
+    <button class="add-btn" onclick="addCity()">Add City</button>
+    <div id="cityList"></div>
+    <button onclick="findMeetingTime()">Find Overlapping Time</button>
+
+    <div class="results" id="results"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.2/build/global/luxon.min.js"></script>
+  <script>
+    const { DateTime, Interval } = luxon;
+    const cities = [];
+    const cityList = document.getElementById("cityList");
+    const results = document.getElementById("results");
+
+    async function addCity() {
+      const input = document.getElementById("cityInput");
+      const city = input.value.trim();
+      if (!city) return;
+      cities.push(city);
+      const div = document.createElement("div");
+      div.textContent = city;
+      cityList.appendChild(div);
+      input.value = "";
+    }
+
+    // Replace this function
+async function getCityOffset(city) {
+  const zoneMap = {
+    "new york": "America/New_York",
+    "london": "Europe/London",
+    "tokyo": "Asia/Tokyo",
+    "sydney": "Australia/Sydney",
+    "mumbai": "Asia/Kolkata",
+    "paris": "Europe/Paris",
+    "san francisco": "America/Los_Angeles",
+    "toronto": "America/Toronto",
+    "berlin": "Europe/Berlin",
+    "dubai": "Asia/Dubai"
+  };
+
+  const zone = zoneMap[city.toLowerCase()];
+  if (!zone) return null;
+
+  return {
+    city,
+    zone
+  };
+}
+
+
+    async function findMeetingTime() {
+      results.innerHTML = "Calculating...";
+      const timeWindows = [];
+
+      for (let city of cities) {
+        const data = await getCityOffset(city);
+        if (!data) {
+          results.innerHTML = `Could not find time zone info for "${city}"`;
+          return;
+        }
+
+        // Convert 9AM to 8PM in city's local time to UTC
+        const localStart = DateTime.local().setZone(data.zone).set({ hour: 9, minute: 0, second: 0 });
+        const localEnd = DateTime.local().setZone(data.zone).set({ hour: 20, minute: 0, second: 0 });
+
+        const startUTC = localStart.toUTC();
+        const endUTC = localEnd.toUTC();
+
+        timeWindows.push({ city: data.city, zone: data.zone, range: Interval.fromDateTimes(startUTC, endUTC) });
+      }
+
+      // Find overlapping interval in UTC
+      let overlap = timeWindows[0].range;
+      for (let i = 1; i < timeWindows.length; i++) {
+        overlap = overlap.intersection(timeWindows[i].range);
+        if (!overlap) break;
+      }
+
+      if (!overlap) {
+        results.innerHTML = "<b>No overlapping time window found.</b>";
+        return;
+      }
+
+      // Display results
+      let html = "<h3>✅ Overlapping Time Window (1 hour block)</h3>";
+      const start = overlap.start;
+      const end = overlap.end;
+      const duration = end.diff(start, "hours").hours;
+
+      if (duration < 1) {
+        html += "<p>Common availability is less than 1 hour.</p>";
+      }
+
+      const suggestedTime = start.plus({ hours: 0.5 }); // Suggest middle of overlap
+      html += `<table><tr><th>City</th><th>Suggested Meeting Time</th></tr>`;
+      for (let win of timeWindows) {
+        const localTime = suggestedTime.setZone(win.zone).toFormat("hh:mm a");
+        html += `<tr><td>${win.city}</td><td>${localTime}</td></tr>`;
+      }
+      html += "</table>";
+      results.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
