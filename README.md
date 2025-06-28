@@ -1,5 +1,5 @@
 
-# 🕒 TimeZoneBuddy
+# 🕒 TimeZoneMeeting-Tool
 
 **TimeZoneBuddy** is a web-based tool that helps users from different time zones find a common overlapping time for virtual meetings. It assumes each participant is available between **9:00 AM and 8:00 PM local time** and suggests a suitable 1-hour meeting window.
 
